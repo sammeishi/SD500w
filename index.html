@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+          content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>SD500W</title>
+    <script src="global/conf"></script>
+    <script src="public/PFlibs/lodash/lodash.min.js"></script>
+    <script src="public/PFlibs/jquery/jquery.min.js"></script>
+    <script src="public/PFlibs/vue/vue.min.js"></script>
+    <script src="public/PFlibs/requirejs/require.js"></script>
+    <style>
+        html,body{
+            height: 100%;
+            overflow: hidden;
+        }
+        body{
+            background: url("public/images/bg.jpg");
+            background-size: cover;
+        }
+        .ball{
+            margin: 50px 0 0 0;
+        }
+        .ball .line{
+            margin: 20px 15px;
+            text-align: center;
+        }
+        .ball .line:nth-child(odd) .item{
+            background: red;
+            color: #fff;
+        }
+        .ball .line:nth-child(even) .item{
+            background: blue;
+            color: #fff;
+        }
+        .ball .line .item{
+            display: inline-block;
+            width: 40px;
+            height: 40px;
+            line-height: 40px;
+            text-align: center;
+            border-radius: 100px;
+            font-size: 1.2rem;
+            margin: 0 5px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.9);
+        }
+        .progressInfo{
+            text-align: center;
+            margin: 10px 0 0 0;
+            font-size: 0.8rem;
+        }
+        .ctl{
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 150px;
+        }
+        .ctl select,.ctl button{
+            border: none;
+            height: 30px;
+            color: #fff;
+            background: rgba(0,0,0,0.5);
+            outline: none;
+        }
+        .ctl .submit button{
+            background: #0c9337;
+            border-radius: 3px;
+            box-shadow: 1px 1px 3px #000;
+            padding: 0 10px;
+        }
+        .ctl .opt{
+            height: 40%;
+            line-height: 60px;
+        }
+        .ctl .opt .optContent{
+            text-align: center;
+            background: rgba(0,0,0,0.7);
+        }
+        .ctl .submit{
+            height: 60%;
+            text-align: center;
+            line-height: 80px;
+            background: #000000e8;
+        }
+    </style>
+</head>
+<body>
+<div id="main">
+    <div class="ball">
+        <p v-for="part in ball" class="line">
+            <span v-for="b in part" class="item">{{b}}</span>
+        </p>
+    </div>
+    <div class="progressInfo"></div>
+    <div class="ctl">
+        <div class="opt">
+            <div v-show="generator == 'random'" class="optContent">
+                <select data-opt-key="count">
+                    <option value="10000">1万次</option>
+                    <option value="100000">10万次</option>
+                    <option value="1000000">100万次</option>
+                    <option value="10000000">1000万次</option>
+                    <option value="100000000">1亿次</option>
+                </select>
+            </div>
+        </div>
+        <div class="submit">
+            <select v-model="kind">
+                <option v-for="(item,code) in GCONF.kind" v-bind:value="code">
+                    {{ item.show }}
+                </option>
+            </select>
+            <select v-model="generator">
+                <option v-for="(item,code) in GCONF.generator" v-bind:value="code">
+                    {{ item.name }}
+                </option>
+            </select>
+            <button v-show="startStopBtn" @click="submit()">生成500万</button>
+            <button v-show="!startStopBtn" @click="submit()">停止生成</button>
+        </div>
+    </div>
+</div>
+</body>
+<script>
+    $(function(){
+        new Vue({
+            el:"#main",
+            data:{
+                startStopBtn: true,
+                currGenerator: null, //当前生成器
+                ball: [], //球列表
+                kind: "pls",
+                generator: "random"
+            },
+            methods:{
+                /*
+                * 执行生成器
+                * */
+                runGenerator:function(args){
+                    let entry = "/client.js";
+                    let path = "generator/";
+                    let that = this;
+                    requirejs([path + args.name + entry],function( g ){
+                        let ins = that.currGenerator = new g();
+                        ins.kind = args.kind;
+                        ins.opt = args.opt;
+                        ins.onFinish = args.onFinish;
+                        ins.onProgress = args.onProgress;
+                        ins.onError = args.onError;
+                        ins.run();
+                    });
+                },
+                /*
+                * 获取生成器选项
+                * */
+                getCurrOpt:function(){
+                    let opt = {};
+                    $(this.$el).find('.opt .optContent').each(function(){
+                        if( $(this).is(":visible") ){
+                            $(this).find('[data-opt-key]').each(function(){
+                                opt[ $(this).attr('data-opt-key') ] = $(this).val();
+                            });
+                        }
+                    });
+                    return opt;
+                },
+                /*
+                * 开始生成
+                * */
+                submit:function(){
+                    this.startStopBtn ? this.start() : this.stop();
+                    this.startStopBtn = !this.startStopBtn;
+                },
+                start:function(){
+                    let that = this;
+                    this.progress = 0;
+                    this.runGenerator({
+                            name: this.generator,
+                            kind: GCONF.kind[ this.kind ],
+                            opt: this.getCurrOpt(),
+                            onFinish:function(){
+                                that.startStopBtn = true;
+                                that.currGenerator = null;
+                            },
+                            onProgress:function( count,p,currRes ){
+                                that.ball = currRes;
+                                let html = "";
+                                if( count !== null ){
+                                    html += "次数:" + count;
+                                }
+                                if( p !== null ){
+                                    html += " 进度:" + p + "%";
+                                }
+                                $('.progressInfo').html( html );
+                            },
+                            onError:function(){},
+                    });
+                },
+                stop:function(){
+                    if( this.currGenerator ){
+                        this.currGenerator.stop();
+                        this.currGenerator = null;
+                    }
+                }
+            },
+        });
+    });
+</script>
+</html>
