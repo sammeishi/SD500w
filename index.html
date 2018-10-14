@@ -65,8 +65,13 @@
             background: rgba(0,0,0,0.5);
             outline: none;
         }
-        .ctl .submit button{
+        .ctl .submit .redBtn{
+            background: #c01400;
+        }
+        .ctl .submit .greenBtn{
             background: #0c9337;
+        }
+        .ctl .submit button{
             border-radius: 3px;
             box-shadow: 1px 1px 3px #000;
             padding: 0 10px;
@@ -118,8 +123,8 @@
                     {{ item.name }}
                 </option>
             </select>
-            <button v-show="startStopBtn" @click="submit()">生成500万</button>
-            <button v-show="!startStopBtn" @click="submit()">停止生成</button>
+            <button class="greenBtn" v-show="startStopBtn" @click="submit()">生成500万</button>
+            <button class="redBtn" v-show="!startStopBtn" @click="submit()">停止生成</button>
         </div>
     </div>
 </div>
@@ -133,7 +138,7 @@
                 currGenerator: null, //当前生成器
                 ball: [], //球列表
                 kind: "pls",
-                generator: "random"
+                generator: "PI"
             },
             methods:{
                 /*
@@ -145,6 +150,7 @@
                     let that = this;
                     requirejs([path + args.name + entry],function( g ){
                         let ins = that.currGenerator = new g();
+                        ins.kindName = args.kindName;
                         ins.kind = args.kind;
                         ins.opt = args.opt;
                         ins.onFinish = args.onFinish;
@@ -179,11 +185,14 @@
                     this.progress = 0;
                     this.runGenerator({
                             name: this.generator,
+                            kindName: this.kind,
                             kind: GCONF.kind[ this.kind ],
                             opt: this.getCurrOpt(),
-                            onFinish:function(){
+                            onFinish:function( res,msg ){
+                                that.ball = res;
                                 that.startStopBtn = true;
                                 that.currGenerator = null;
+                                $('.progressInfo').html( msg );
                             },
                             onProgress:function( count,p,currRes ){
                                 that.ball = currRes;
